@@ -82,7 +82,7 @@ model Number {
   number   String @db.VarChar(20) @unique
   clientId BigInt @map("client_id")
 
-  client Client @relation(fields: [clientId], references: [id])
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@id([number])
   @@map("numbers")
@@ -93,7 +93,7 @@ model ClientInfo {
   clientId BigInt @map("client_id")
   value    String @db.VarChar(60)
 
-  client Client @relation(fields: [clientId], references: [id])
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@id([key, clientId])
   @@map("client_info")
@@ -133,7 +133,7 @@ model ClientProject {
   lastDialedAt DateTime? @map("last_dialed_at")
   attemptCount Int?      @default(0) @map("attempt_count")
 
-  client  Client  @relation(fields: [clientId], references: [id])
+  client  Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@id([clientId, projectId])
