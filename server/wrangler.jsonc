@@ -1,0 +1,7 @@
+// wrangler.jsonc
+{
+	"name": "wijha-callcenter",
+	"main": "src/main.ts", // Points to your primary entry point file
+	"compatibility_flags": [ "nodejs_compat" ]
+}
+

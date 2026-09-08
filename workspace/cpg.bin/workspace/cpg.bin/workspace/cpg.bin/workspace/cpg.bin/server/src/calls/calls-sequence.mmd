@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant MobileApp as Mobile App (Agent)
+    participant Server as NestJS API (/api/v1)
+    participant DB as PostgreSQL
+
+    Note over MobileApp,DB: Call Loop (repeats)
+    MobileApp->>Server: GET /calls/next?project_id=X
+    Server->>DB: Query next available Owner
+    DB-->>Server: owner + call history
+    alt No owners available
+        Server-->>MobileApp: 204 No Content
+    else Owner found
+        Server-->>MobileApp: { owner, numbers, prev_calls }
+    end
+
+    MobileApp->>Server: POST /calls/calling { owner_id }
+    Server->>DB: UPDATE owner.lastDialedAt
+    DB-->>Server: ok
+    Server-->>MobileApp: { success }
+
+    Note over MobileApp: Agent places out-of-band phone call
+
+    MobileApp->>Server: POST /calls { owner_id, status, time, duration?, agent_notes? }
+    Server->>DB: INSERT call_detail_record
+    alt status == not_interested
+        Server->>DB: UPDATE owner.status = 'inactive'
+    end
+    DB-->>Server: ok
+    Server-->>MobileApp: { id, status }

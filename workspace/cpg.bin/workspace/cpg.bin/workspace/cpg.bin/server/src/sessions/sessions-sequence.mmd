@@ -1,0 +1,32 @@
+sequenceDiagram
+    participant MobileApp as Mobile App (Agent)
+    participant Server as NestJS API (/api/v1)
+    participant DB as PostgreSQL
+
+    Note over MobileApp,DB: Session Lifecycle
+    MobileApp->>Server: POST /sessions/active (JWT)
+    Server->>DB: Find UserSession where lastBeat within 5 min
+    DB-->>Server: existing session or null
+    alt Session exists (within timeout)
+        Server->>DB: UPDATE lastBeat=now, duration
+        DB-->>Server: updated session
+        Server-->>MobileApp: { first_beat, last_beat, is_active: true, duration }
+    else No active session (timeout exceeded)
+        Server->>DB: INSERT UserSession (firstBeat=now, lastBeat=now)
+        Server->>DB: UPSERT ActiveSession
+        DB-->>Server: new session
+        Server-->>MobileApp: { first_beat, last_beat, is_active: true, duration: 0 }
+    end
+
+    Note over MobileApp: Heartbeat repeats every few minutes
+
+    MobileApp->>Server: GET /sessions
+    alt User role
+        Server->>DB: Filter by current user
+    else Admin role
+        Server->>DB: Filter by query params
+    end
+    DB-->>Server: UserSessions[]
+    Server->>DB: Find ActiveSessions
+    DB-->>Server: active markers
+    Server-->>MobileApp: [{ first_beat, last_beat, is_active, duration }]

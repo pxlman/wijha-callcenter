@@ -1,0 +1,129 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id                       Int                       @id @default(autoincrement())
+  name                     String                    @unique @db.VarChar(100)
+  description              String?
+  clientProjects           ClientProject[]
+  projectCallDetailRecords ProjectCallDetailRecord[]
+
+  @@map("project")
+}
+
+model User {
+  id                Int                @id @default(autoincrement())
+  email             String             @unique @db.VarChar(50)
+  passwordHash      String             @map("password_hash") @db.VarChar(255)
+  phoneNumber       String?            @unique @map("phone_number") @db.VarChar(20)
+  name              String?            @db.VarChar(50)
+  role              String             @db.VarChar(50)
+  otp               String?            @db.VarChar(6)
+  otpExpiry         DateTime?          @map("otp_expiry")
+  jwtToken          String?            @map("jwt_token")
+  profileMime       String?            @map("profile_mime") @db.VarChar(20)
+  profileImage      Bytes?             @map("profile_image")
+  callDetailRecords CallDetailRecord[]
+  clientAssignments Client[]           @relation("ClientAgent")
+  userSessions      UserSession[]
+
+  @@map("user")
+}
+
+model UserSession {
+  agentId        Int            @map("agent_id")
+  firstBeat      DateTime       @map("first_beat")
+  lastBeat       DateTime       @map("last_beat")
+  duration       Int            @default(0) @map("duration")
+  activeSessions ActiveSession?
+  agent          User           @relation(fields: [agentId], references: [id])
+
+  @@id([agentId, firstBeat])
+  @@map("user_session")
+}
+
+model ActiveSession {
+  agentId   Int         @id @map("agent_id")
+  firstBeat DateTime    @map("first_beat")
+  session   UserSession @relation(fields: [agentId, firstBeat], references: [agentId, firstBeat], onDelete: Cascade)
+
+  @@unique([agentId, firstBeat])
+  @@map("active_session")
+}
+
+model Client {
+  id                BigInt             @id @default(autoincrement())
+  name              String?            @db.VarChar(50)
+  type              String             @db.VarChar(10)
+  nextDialAt        DateTime?          @map("next_dial_at")
+  agentId           Int?               @map("agent_id")
+  callDetailRecords CallDetailRecord[]
+  agent             User?              @relation("ClientAgent", fields: [agentId], references: [id])
+  clientInfo        ClientInfo[]
+  clientProjects    ClientProject[]
+  numbers           Number[]
+
+  @@map("client")
+}
+
+model Number {
+  number   String @id @unique @db.VarChar(20)
+  clientId BigInt @map("client_id")
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("numbers")
+}
+
+model ClientInfo {
+  key      String @db.VarChar(60)
+  clientId BigInt @map("client_id")
+  value    String @db.VarChar(60)
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@id([key, clientId])
+  @@map("client_info")
+}
+
+model CallDetailRecord {
+  id           BigInt                    @id @default(autoincrement())
+  agentId      Int?                      @map("agent_id")
+  status       String?                   @db.VarChar(50)
+  time         DateTime
+  duration     Int?
+  agentNotes   String?                   @map("agent_notes")
+  clientId     BigInt?                   @map("client_id")
+  agent        User?                     @relation(fields: [agentId], references: [id])
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  projectLinks ProjectCallDetailRecord[]
+
+  @@map("call_detail_record")
+}
+
+model ProjectCallDetailRecord {
+  projectId          Int              @map("project_id")
+  callDetailRecordId BigInt           @map("call_detail_record_id")
+  callRecord         CallDetailRecord @relation(fields: [callDetailRecordId], references: [id])
+  project            Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, callDetailRecordId])
+  @@map("project_call_detail_record")
+}
+
+model ClientProject {
+  clientId     BigInt    @map("client_id")
+  projectId    Int       @map("project_id")
+  status       String?   @default("dial") @db.VarChar(50)
+  lastDialedAt DateTime? @map("last_dialed_at")
+  attemptCount Int?      @default(0) @map("attempt_count")
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([clientId, projectId])
+  @@map("client_project")
+}

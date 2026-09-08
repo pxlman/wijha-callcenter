@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DATABASE_URL: postgresql://myuser:mypassword@localhost:5432/mydb
+
+jobs:
+  typecheck:
+    name: TypeScript Compilation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm --prefix server install
+      - name: Generate Prisma client
+        run: npm --prefix server run prisma:generate
+      - name: Typecheck
+        run: npx --prefix server tsc --noEmit
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myuser
+          POSTGRES_PASSWORD: mypassword
+          POSTGRES_DB: mydb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm --prefix server install
+      - name: Generate Prisma client
+        run: npm --prefix server run prisma:generate
+      - name: Deploy database schema
+        run: |
+          npx --prefix server prisma db push --schema=./server/prisma/schema.prisma --accept-data-loss
+      - name: Seed database
+        run: PGPASSWORD=mypassword psql -h localhost -U myuser -d mydb -f server/prisma/seed.sql
+      - name: Run unit tests with coverage
+        run: npm --prefix server test -- --coverage
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm --prefix server install
+      - name: Run npm audit
+        run: npm --prefix server audit --audit-level=moderate
+        continue-on-error: true
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: myuser
+          POSTGRES_PASSWORD: mypassword
+          POSTGRES_DB: mydb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm --prefix server install
+      - name: Generate Prisma client
+        run: npm --prefix server run prisma:generate
+      - name: Deploy database schema
+        run: npx --prefix server prisma db push --schema=./server/prisma/schema.prisma --accept-data-loss
+      - name: Seed database
+        run: PGPASSWORD=mypassword psql -h localhost -U myuser -d mydb -f server/prisma/seed.sql
+      - name: Run E2E tests
+        run: npm --prefix server run test:e2e

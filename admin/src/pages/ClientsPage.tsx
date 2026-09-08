@@ -824,7 +824,7 @@ export default function ClientsPage() {
 
                   {/* Client Type Filter */}
                   <div className="flex items-center rounded-md border border-input bg-background overflow-hidden h-9 shrink-0">
-                    {(["", "OWNER", "LEAD"] as const).map((t) => (
+                    {(["", "OWNER", "LEAD" , "BOTH"] as const).map((t) => (
                       <button
                         key={t || "all"}
                         type="button"
@@ -835,7 +835,7 @@ export default function ClientsPage() {
                             : "hover:bg-slate-100 text-slate-600"
                         }`}
                       >
-                        {t === "" ? "All Types" : t === "OWNER" ? "Owners" : "Leads"}
+                        {t === "" ? "All Types" : t === "OWNER" ? "Owners" : t === "LEAD" ? "Leads" : "Both"}
                       </button>
                     ))}
                   </div>
