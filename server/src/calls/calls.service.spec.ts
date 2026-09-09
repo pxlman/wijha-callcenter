@@ -569,4 +569,33 @@ describe('CallsService', () => {
       expect(prisma.clientProject.upsert).not.toHaveBeenCalled();
     });
   });
+
+  describe('remove', () => {
+    it('should delete a call record and its project associations', async () => {
+      prisma.callDetailRecord.findUnique.mockResolvedValue({ id: 1n } as any);
+      prisma.projectCallDetailRecord.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.callDetailRecord.delete.mockResolvedValue({ id: 1n } as any);
+
+      await service.remove(1);
+
+      expect(prisma.projectCallDetailRecord.deleteMany).toHaveBeenCalledWith({ where: { callDetailRecordId: 1 } });
+      expect(prisma.callDetailRecord.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    });
+
+    it('should throw NotFoundException for non-existent call', async () => {
+      prisma.callDetailRecord.findUnique.mockResolvedValue(null);
+      await expect(service.remove(999)).rejects.toThrow('Call 999 not found');
+    });
+
+    it('should delete call even when it has no project associations', async () => {
+      prisma.callDetailRecord.findUnique.mockResolvedValue({ id: 2n } as any);
+      prisma.projectCallDetailRecord.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.callDetailRecord.delete.mockResolvedValue({ id: 2n } as any);
+
+      await service.remove(2);
+
+      expect(prisma.projectCallDetailRecord.deleteMany).toHaveBeenCalledWith({ where: { callDetailRecordId: 2 } });
+      expect(prisma.callDetailRecord.delete).toHaveBeenCalledWith({ where: { id: 2 } });
+    });
+  });
 });

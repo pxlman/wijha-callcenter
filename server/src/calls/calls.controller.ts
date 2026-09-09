@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   Query,
@@ -20,12 +21,14 @@ import type { CallResponseDto } from './dto/call-response.dto';
 import type { NextOwnerResponseDto } from './dto/next-owner-response.dto';
 import type { StatusCountDto } from './dto/status-count.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { RolesGuard } from '@/common/guards/roles.guard';
+import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '@/common/interfaces/authenticated-user.interface';
 import { DEFAULT_PAGE_LIMIT } from './config';
 
 @Controller('calls')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class CallsController {
   constructor(private callsService: CallsService) {}
 
@@ -91,5 +94,12 @@ export class CallsController {
   @Get(':callId')
   async findOne(@Param('callId', ParseIntPipe) callId: number): Promise<CallResponseDto | null> {
     return this.callsService.findById(callId);
+  }
+
+  @Delete(':callId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles('admin')
+  async remove(@Param('callId', ParseIntPipe) callId: number): Promise<void> {
+    await this.callsService.remove(callId);
   }
 }
