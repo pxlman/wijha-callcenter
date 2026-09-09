@@ -128,7 +128,7 @@ async function setup() {
     token: adminToken,
     body: {
       name: 'Integration Test Client',
-      phones: [{ phone: '555-9999' }],
+      phones: [{ phone: '01012345678' }],
     },
   });
   assertEqual(res.status, 201, 'Create test client returns 201');
