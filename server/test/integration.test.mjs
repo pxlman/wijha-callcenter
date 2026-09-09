@@ -15,6 +15,7 @@ const BASE = process.env.API_URL || 'http://localhost:3000/api/v1';
 
 let passed = 0;
 let failed = 0;
+let testClientId = null;
 
 function assert(condition, label) {
   if (condition) {
@@ -107,7 +108,7 @@ async function sessionTests() {
   assert(list.json.length > 0, 'At least one session exists');
 
   // Delete session (admin only)
-  const del = await api('DELETE', `/sessions/${beat.json.agent_id}/${encodeURIComponent(sessionFirstBeat)}`, { token: adminToken });
+  const del = await api('DELETE', `/sessions/${beat.json.agent_id}/${sessionFirstBeat}`, { token: adminToken });
   assertEqual(del.status, 204, 'Delete session returns 204');
 
   // Verify deleted
@@ -118,6 +119,32 @@ async function sessionTests() {
   assert(!stillExists, 'Deleted session no longer in list');
 }
 
+// ── Setup & Cleanup ──────────────────────────────────────────────────────────
+
+async function setup() {
+  console.log('\n=== Setup ===');
+
+  const res = await api('POST', '/owners', {
+    token: adminToken,
+    body: {
+      name: 'Integration Test Client',
+      phones: [{ phone: '555-9999' }],
+    },
+  });
+  assertEqual(res.status, 201, 'Create test client returns 201');
+  assertNotNull(res.json?.id, 'Test client has an id');
+  testClientId = res.json.id;
+}
+
+async function cleanup() {
+  console.log('\n=== Cleanup ===');
+
+  if (testClientId) {
+    const del = await api('DELETE', `/owners/${testClientId}`, { token: adminToken });
+    assertEqual(del.status, 204, 'Delete test client returns 204');
+  }
+}
+
 // ── Calls ────────────────────────────────────────────────────────────────────
 
 let callId = null;
@@ -125,11 +152,11 @@ let callId = null;
 async function callTests() {
   console.log('\n=== Calls ===');
 
-  // Submit a call (no project)
+  // Submit a call using the test client
   const submit = await api('POST', '/calls', {
     token: agentToken,
     body: {
-      client_id: 1,
+      client_id: testClientId,
       status: 'answered',
       time: new Date().toISOString(),
       duration: 45,
@@ -183,8 +210,10 @@ async function run() {
   try {
     await loginTests();
     await authGuardTests();
+    await setup();
     await sessionTests();
     await callTests();
+    await cleanup();
   } catch (err) {
     failed++;
     console.error(`\n  FATAL  ${err.message}`);
