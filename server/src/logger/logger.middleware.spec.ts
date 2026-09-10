@@ -4,24 +4,18 @@
  * Tests the LoggerMiddleware which logs incoming HTTP requests.
  * The middleware:
  *   1. Logs the HTTP method and URL (e.g., "[GET] /api/v1/owners")
- *   2. Logs the request body if it's non-empty
- *   3. Logs query parameters if present
- *   4. Logs route params if more than 1 param is present
- *   5. Registers a 'finish' listener on the response to log response time
- *   6. Calls next() to pass control to the next handler
- *
- * Key fix from original: the middleware now uses proper Express Request/Response
- * types (no `any`) and safely handles undefined body (common for GET requests).
+ *   2. Logs query parameters if present
+ *   3. Logs route params if more than 1 param is present
+ *   4. Calls next() to pass control to the next handler
  *
  * Test coverage:
  *   - Logs method + URL on every request
- *   - Logs body when present and non-empty
- *   - Skips body logging when undefined or empty
+ *   - Does NOT log body (disabled)
  *   - Logs query params when present
  *   - Skips query logging when empty
  *   - Logs params when more than 1 param present
  *   - Skips params logging when 0 or 1 params
- *   - Registers response 'finish' listener for response time logging
+ *   - Does NOT register response 'finish' listener (disabled)
  *   - Calls next() exactly once
  *   - Handles GET requests with undefined body without crashing
  */
@@ -96,9 +90,9 @@ describe('LoggerMiddleware', () => {
 
   /**
    * Input: POST request with body containing name and phones
-   * Expected: console.log called with 'Body:' and the body object
+   * Expected: body is NOT logged (body logging is disabled)
    */
-  it('should log body when present and non-empty', () => {
+  it('should not log body when present', () => {
     const req = createMockRequest({
       method: 'POST',
       originalUrl: '/api/v1/owners',
@@ -109,7 +103,7 @@ describe('LoggerMiddleware', () => {
 
     middleware.use(req, res, next);
 
-    expect(consoleSpy).toHaveBeenCalledWith('Body:', { name: 'Test Owner', phones: [{ phone: '+201012345678' }] });
+    expect(consoleSpy).not.toHaveBeenCalledWith('Body:', expect.anything());
   });
 
   /**
@@ -215,16 +209,16 @@ describe('LoggerMiddleware', () => {
 
   /**
    * Input: any request
-   * Expected: res.on('finish', callback) is called — registers response time logging
+   * Expected: res.on is NOT called (finish listener is disabled)
    */
-  it('should log response time on finish', () => {
+  it('should not register finish listener', () => {
     const req = createMockRequest({ method: 'GET', originalUrl: '/api/v1/projects' });
     const res = createMockResponse();
     const next = jest.fn();
 
     middleware.use(req, res, next);
 
-    expect(res.on).toHaveBeenCalledWith('finish', expect.any(Function));
+    expect(res.on).not.toHaveBeenCalled();
   });
 
   /**

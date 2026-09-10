@@ -108,6 +108,16 @@ export class CallsService {
     return this.toCallResponse(call);
   }
 
+  async remove(id: number): Promise<void> {
+    const call = await this.prisma.callDetailRecord.findUnique({ where: { id } });
+    if (!call) {
+      throw new NotFoundException(`Call ${id} not found`);
+    }
+
+    await this.prisma.projectCallDetailRecord.deleteMany({ where: { callDetailRecordId: id } });
+    await this.prisma.callDetailRecord.delete({ where: { id } });
+  }
+
   private async assertProjectExists(projectId: number): Promise<void> {
     const project = await this.prisma.project.findFirst({ where: { id: projectId } });
     if (!project) {

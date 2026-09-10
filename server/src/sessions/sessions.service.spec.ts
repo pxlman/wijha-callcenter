@@ -249,4 +249,28 @@ describe('SessionsService', () => {
       expect(prisma.activeSession.create).not.toHaveBeenCalled();
     });
   });
+
+  describe('remove', () => {
+    it('should delete a session and its active session', async () => {
+      prisma.userSession.findUnique.mockResolvedValue(
+        mockUserSession({ agentId: 1, firstBeat: new Date('2024-06-01T09:00:00Z') }),
+      );
+      prisma.activeSession.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.userSession.delete.mockResolvedValue(
+        mockUserSession({ agentId: 1, firstBeat: new Date('2024-06-01T09:00:00Z') }),
+      );
+
+      await service.remove(1, new Date('2024-06-01T09:00:00Z'));
+
+      expect(prisma.activeSession.deleteMany).toHaveBeenCalledWith({ where: { agentId: 1 } });
+      expect(prisma.userSession.delete).toHaveBeenCalledWith({
+        where: { agentId_firstBeat: { agentId: 1, firstBeat: new Date('2024-06-01T09:00:00Z') } },
+      });
+    });
+
+    it('should throw NotFoundException for non-existent session', async () => {
+      prisma.userSession.findUnique.mockResolvedValue(null);
+      await expect(service.remove(999, new Date('2024-06-01T09:00:00Z'))).rejects.toThrow('not found');
+    });
+  });
 });

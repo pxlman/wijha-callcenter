@@ -245,4 +245,21 @@ describe('CallsController', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('DELETE /calls/:callId', () => {
+    it('should delete a call record', async () => {
+      prisma.callDetailRecord.findUnique.mockResolvedValue({ id: 1n } as any);
+      prisma.projectCallDetailRecord.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.callDetailRecord.delete.mockResolvedValue({ id: 1n } as any);
+
+      await expect(controller.remove(1)).resolves.toBeUndefined();
+      expect(prisma.projectCallDetailRecord.deleteMany).toHaveBeenCalledWith({ where: { callDetailRecordId: 1 } });
+      expect(prisma.callDetailRecord.delete).toHaveBeenCalledWith({ where: { id: 1 } });
+    });
+
+    it('should throw NotFoundException for non-existent call', async () => {
+      prisma.callDetailRecord.findUnique.mockResolvedValue(null);
+      await expect(controller.remove(999)).rejects.toThrow('Call 999 not found');
+    });
+  });
 });

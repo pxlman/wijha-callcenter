@@ -962,6 +962,26 @@ paths:
                 $ref: "#/components/schemas/CallDetailRecord"
         "404":
           $ref: "#/components/responses/NotFound"
+    delete:
+      summary: Delete a call record (admin only)
+      operationId: deleteCall
+      tags: [calls]
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Call record deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /calls/statuses:
     get:
@@ -1075,6 +1095,33 @@ paths:
                 $ref: "#/components/schemas/SessionResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  /sessions/{agentId}/{firstBeat}:
+    delete:
+      summary: Delete a session (admin only)
+      operationId: deleteSession
+      tags: [sessions]
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: firstBeat
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "204":
+          description: Session deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /users:
     get:

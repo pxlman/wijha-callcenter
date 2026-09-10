@@ -91,4 +91,27 @@ describe('SessionsController', () => {
       jest.useRealTimers();
     });
   });
+
+  describe('DELETE /sessions/:agentId/:firstBeat', () => {
+    it('should delete a session', async () => {
+      prisma.userSession.findUnique.mockResolvedValue(
+        mockUserSession({ agentId: 1, firstBeat: new Date('2024-06-01T09:00:00Z') }),
+      );
+      prisma.activeSession.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.userSession.delete.mockResolvedValue(
+        mockUserSession({ agentId: 1, firstBeat: new Date('2024-06-01T09:00:00Z') }),
+      );
+
+      await expect(controller.remove('1', '2024-06-01T09:00:00Z')).resolves.toBeUndefined();
+      expect(prisma.activeSession.deleteMany).toHaveBeenCalledWith({ where: { agentId: 1 } });
+      expect(prisma.userSession.delete).toHaveBeenCalledWith({
+        where: { agentId_firstBeat: { agentId: 1, firstBeat: new Date('2024-06-01T09:00:00Z') } },
+      });
+    });
+
+    it('should throw NotFoundException for non-existent session', async () => {
+      prisma.userSession.findUnique.mockResolvedValue(null);
+      await expect(controller.remove('999', '2024-06-01T09:00:00Z')).rejects.toThrow('not found');
+    });
+  });
 });
