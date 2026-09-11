@@ -5,6 +5,8 @@ info:
   description: >
     Broker API that dispatches client leads to agent mobile devices.
     Agents authenticate, receive clients to call, and submit call outcomes.
+  license:
+    name: Proprietary
 
 servers:
   - url: https://api.server.test/api/v1
@@ -16,7 +18,6 @@ servers:
 
 security:
   - BearerAuth: []
-  # - apiKeyAuth: []
 
 components:
   securitySchemes:
@@ -24,10 +25,6 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-    apiKeyAuth:
-      type: apiKey
-      in: header
-      name: X-API-Key
 
   schemas:
 
@@ -111,13 +108,19 @@ components:
 
     BulkCreateClientsRequest:
       type: object
-      required: [clients]
       properties:
         clients:
           type: array
           minItems: 1
           items:
             $ref: "#/components/schemas/CreateClientRequest"
+        owners:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CreateClientRequest"
+          deprecated: true
+          description: Deprecated v1 alias of clients; either clients or owners must be provided
 
     Project:
       type: object
@@ -671,7 +674,7 @@ paths:
           $ref: "#/components/responses/NotFound"
 
     patch:
-      summary: Update client type or snooze (next_dial_at)
+      summary: Update client (name, type, agent, snooze, phones, info)
       operationId: updateClient
       tags: [clients]
       parameters:
@@ -688,6 +691,8 @@ paths:
             schema:
               type: object
               properties:
+                name:
+                  type: string
                 type:
                   $ref: "#/components/schemas/ClientType"
                 agent_id:
@@ -697,6 +702,15 @@ paths:
                   type: string
                   format: date-time
                   nullable: true
+                phones:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: "#/components/schemas/ClientPhone"
+                info:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ClientInfo"
       responses:
         "200":
           description: Updated client
@@ -744,6 +758,223 @@ paths:
     post:
       summary: Assign a client to a project by project name
       operationId: assignClientProject
+      tags: [clients]
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project_name]
+              properties:
+                project_name:
+                  type: string
+      responses:
+        "200":
+          description: Client updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /clients:
+    get:
+      summary: List clients (paginated, filterable) [v2]
+      operationId: listClientsV2
+      tags: [clients]
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+        - name: agent_id
+          in: query
+          schema:
+            type: integer
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/ClientType"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        "200":
+          description: Paginated client list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedClients"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      summary: Create a new client [v2]
+      operationId: createClientV2
+      tags: [clients]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClientRequest"
+      responses:
+        "201":
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /clients/bulk:
+    post:
+      summary: Bulk create or merge clients [v2]
+      operationId: bulkCreateClientsV2
+      tags: [clients]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkCreateClientsRequest"
+      responses:
+        "201":
+          description: Clients created or updated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Client"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /clients/{clientId}:
+    get:
+      summary: Get a single client with numbers and info [v2]
+      operationId: getClientV2
+      tags: [clients]
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Client detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    patch:
+      summary: Update client (name, type, agent, snooze, phones, info) [v2]
+      operationId: updateClientV2
+      tags: [clients]
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                type:
+                  $ref: "#/components/schemas/ClientType"
+                agent_id:
+                  type: integer
+                  nullable: true
+                next_dial_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                phones:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: "#/components/schemas/ClientPhone"
+                info:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/ClientInfo"
+      responses:
+        "200":
+          description: Updated client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      summary: Delete a client [v2]
+      operationId: deleteClientV2
+      tags: [clients]
+      parameters:
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Client deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /clients/statuses:
+    get:
+      summary: Get distinct client statuses with counts (from client_project) [v2]
+      operationId: getClientStatusesV2
+      tags: [clients]
+      responses:
+        "200":
+          description: List of statuses with counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusCount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /clients/{clientId}/projects:
+    post:
+      summary: Assign a client to a project by project name [v2]
+      operationId: assignClientProjectV2
       tags: [clients]
       parameters:
         - name: clientId

@@ -15,7 +15,7 @@
  * requests.
  */
 
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import request from 'supertest';
@@ -132,7 +132,8 @@ export function seedMockPrisma(prisma: DeepMockProxy<PrismaService>): void {
  *
  * Uses the full AppModule (all controllers, guards, strategies, pipes)
  * but overrides PrismaService with a mock — no real database is needed.
- * The app gets the global prefix 'api/v1' and a ValidationPipe identical
+ * The app gets the global prefix 'api' with URI versioning (mirrors main.ts)
+ * and a ValidationPipe identical
  * to production configuration.
  *
  * @returns Object with supertest agent, prisma mock, and module for teardown
@@ -153,7 +154,8 @@ export async function setupIntegrationTest() {
     .compile();
 
   const app = module.createNestApplication();
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api');
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
