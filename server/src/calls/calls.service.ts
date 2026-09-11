@@ -4,9 +4,10 @@ import { PrismaService } from '@/prisma/prisma.service';
 import type { SubmitCallDto } from '@/calls/dto/submit-call.dto';
 import type { NotifyCallingDto } from '@/calls/dto/notify-calling.dto';
 import type { CallResponseDto } from '@/calls/dto/call-response.dto';
-import type { NextOwnerResponseDto } from '@/calls/dto/next-owner-response.dto';
+import type { NextClientResponseDto } from '@/calls/dto/next-client-response.dto';
 import type { StatusCountDto } from '@/calls/dto/status-count.dto';
-import { OwnersService } from '@/owners/owners.service';
+import { ClientsService } from '@/clients/clients.service';
+import type { ClientType } from '@/clients/dto/client-type.enum';
 import { DEFAULT_PAGE_LIMIT } from './config';
 
 const callWithProjects = Prisma.validator<Prisma.CallDetailRecordDefaultArgs>()({
@@ -27,7 +28,7 @@ type CallWithProjects = Prisma.CallDetailRecordGetPayload<typeof callWithProject
 export class CallsService {
   constructor(
     private prisma: PrismaService,
-    private ownersService: OwnersService,
+    private clientsService: ClientsService,
   ) {}
 
   private toCallResponse(call: CallWithProjects): CallResponseDto {
@@ -182,25 +183,31 @@ export class CallsService {
     }
   }
 
-  async getNextOwner(args: { projectId?: number, date?: Date, agentId?: number, type?: 'OWNER' | 'LEAD' | 'BOTH' }): Promise<NextOwnerResponseDto | null> {
-    const owner = await this.ownersService.getNextOwner(args);
-    if (!owner) return null;
+  async getNextClient(args: { projectId?: number; date?: Date; agentId?: number; type?: ClientType | string }): Promise<NextClientResponseDto | null> {
+    const client = await this.clientsService.getNextClient(args);
+    if (!client) return null;
 
     try {
       const calls = await this.prisma.callDetailRecord.findMany({
-        where: { clientId: owner.id },
+        where: { clientId: client.id },
         orderBy: { time: 'desc' },
         include: callWithProjects.include,
       });
 
       return {
-        owner,
-        calls: calls.map(c => this.toCallResponse(c)),
+        client,
+        owner: client,
+        calls: calls.map((c) => this.toCallResponse(c)),
       };
     } catch (error) {
-      console.error('Error occurred while fetching next owner calls:', error);
+      console.error('Error occurred while fetching next client calls:', error);
       throw error;
     }
+  }
+
+  /** @deprecated use getNextClient */
+  async getNextOwner(args: { projectId?: number; date?: Date; agentId?: number; type?: ClientType | string }): Promise<NextClientResponseDto | null> {
+    return this.getNextClient(args);
   }
 
   async getStatusCounts(from?: Date, to?: Date): Promise<StatusCountDto[]> {
