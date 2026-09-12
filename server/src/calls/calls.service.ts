@@ -127,60 +127,55 @@ export class CallsService {
   }
 
   async submit(dto: SubmitCallDto, agentId: number): Promise<CallResponseDto> {
-    try {
-      const client = await this.prisma.client.findUnique({ where: { id: dto.client_id } });
-      if (!client) {
-        throw new NotFoundException(`Client ${dto.client_id} not found`);
-      }
-
-      if (dto.project_id) {
-        await this.assertProjectExists(dto.project_id);
-      }
-
-      const call = await this.prisma.callDetailRecord.create({
-        data: {
-          clientId: dto.client_id,
-          agentId,
-          status: dto.status,
-          time: new Date(dto.time),
-          duration: dto.duration ?? null,
-          agentNotes: dto.agent_notes ?? null,
-        },
-      });
-
-      if (dto.project_id) {
-        await this.prisma.clientProject.upsert({
-          where: { clientId_projectId: { clientId: dto.client_id, projectId: dto.project_id } },
-          create: {
-            clientId: dto.client_id,
-            projectId: dto.project_id,
-            status: dto.status,
-            lastDialedAt: new Date(),
-          },
-          update: { status: dto.status, lastDialedAt: new Date() },
-        });
-      }
-
-      await this.prisma.client.update({
-        where: { id: dto.client_id },
-        data: {
-          nextDialAt: dto.next_dial_at ? new Date(dto.next_dial_at) : null,
-        },
-      });
-      return {
-        id: Number(call.id),
-        client_id: Number(call.clientId),
-        agent_id: call.agentId ?? 0,
-        status: call.status ?? '',
-        time: call.time.toISOString(),
-        duration: call.duration,
-        agent_notes: call.agentNotes,
-        projects: [],
-      };
-    } catch (error) {
-      console.error('Error occurred while submitting call result:', error);
-      throw error;
+    const client = await this.prisma.client.findUnique({ where: { id: dto.client_id } });
+    if (!client) {
+      throw new NotFoundException(`Client ${dto.client_id} not found`);
     }
+
+    if (dto.project_id) {
+      await this.assertProjectExists(dto.project_id);
+    }
+
+    const call = await this.prisma.callDetailRecord.create({
+      data: {
+        clientId: dto.client_id,
+        agentId,
+        status: dto.status,
+        time: new Date(dto.time),
+        duration: dto.duration ?? null,
+        agentNotes: dto.agent_notes ?? null,
+      },
+    });
+
+    if (dto.project_id) {
+      await this.prisma.clientProject.upsert({
+        where: { clientId_projectId: { clientId: dto.client_id, projectId: dto.project_id } },
+        create: {
+          clientId: dto.client_id,
+          projectId: dto.project_id,
+          status: dto.status,
+          lastDialedAt: new Date(),
+        },
+        update: { status: dto.status, lastDialedAt: new Date() },
+      });
+    }
+
+    await this.prisma.client.update({
+      where: { id: dto.client_id },
+      data: {
+        nextDialAt: dto.next_dial_at ? new Date(dto.next_dial_at) : null,
+      },
+    });
+    return {
+      id: Number(call.id),
+      client_id: Number(call.clientId),
+      agent_id: call.agentId ?? 0,
+      status: call.status ?? '',
+      time: call.time.toISOString(),
+      duration: call.duration,
+      agent_notes: call.agentNotes,
+      projects: [],
+    };
   }
 
   async getNextClient(args: { projectId?: number; date?: Date; agentId?: number; type?: ClientType | string }): Promise<NextClientResponseDto | null> {
@@ -251,40 +246,25 @@ export class CallsService {
   }
 
   async notifyCalling(dto: NotifyCallingDto): Promise<void> {
-    const where: { id: number; numbers?: { some: { number: string } } } = { id: dto.client_id };
-    if (dto.client_number) {
-      where.numbers = { some: { number: dto.client_number } };
-    }
+    await this.prisma.client.update({
+      where: { id: dto.client_id },
+      data: { nextDialAt: new Date() },
+    });
 
-    try {
-      const client = await this.prisma.client.findFirst({ where });
-      if (!client) {
-        throw new NotFoundException('Client not found');
-      }
+    if (dto.project_id) {
+      await this.assertProjectExists(dto.project_id);
 
-      await this.prisma.client.update({
-        where: { id: client.id },
-        data: { nextDialAt: new Date() },
-      })
-
-      if (dto.project_id) {
-        await this.assertProjectExists(dto.project_id);
-
-        await this.prisma.clientProject.upsert({
-          where: { clientId_projectId: { clientId: client.id, projectId: dto.project_id } },
-          create: {
-            clientId: client.id,
-            projectId: dto.project_id,
-            status: 'dial',
-            attemptCount: 1,
-            lastDialedAt: new Date(),
-          },
-          update: { lastDialedAt: new Date(), attemptCount: { increment: 1 } },
-        });
-      }
-    } catch (error) {
-      console.error('Error occurred while notifying calling:', error);
-      throw error;
+      await this.prisma.clientProject.upsert({
+        where: { clientId_projectId: { clientId: dto.client_id, projectId: dto.project_id } },
+        create: {
+          clientId: dto.client_id,
+          projectId: dto.project_id,
+          status: 'dial',
+          attemptCount: 1,
+          lastDialedAt: new Date(),
+        },
+        update: { lastDialedAt: new Date(), attemptCount: { increment: 1 } },
+      });
     }
   }
 }

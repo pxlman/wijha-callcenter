@@ -17,6 +17,7 @@
 
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaExceptionFilter } from '@/common/filters/prisma-exception.filter';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import request from 'supertest';
 import { AppModule } from '@/app.module';
@@ -156,6 +157,7 @@ export async function setupIntegrationTest() {
   const app = module.createNestApplication();
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+  app.useGlobalFilters(new PrismaExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

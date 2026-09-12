@@ -152,12 +152,12 @@ describe('Calls E2E', () => {
       .expect(404);
   });
 
-  it('POST /calls/calling with mismatched client_number returns 404', async () => {
+  it('POST /calls/calling ignores client_number and updates by client_id (200)', async () => {
     await app
       .post('/api/v1/calls/calling')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ client_id: clientId, client_number: '+201000000000' })
-      .expect(404);
+      .expect(200);
   });
 
   it('GET /calls/next returns the next dialable client (200)', async () => {

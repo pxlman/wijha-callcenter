@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { CallsService } from './calls.service';
 import { ClientsService } from '@/clients/clients.service';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -525,7 +526,7 @@ describe('CallsService', () => {
       await service.notifyCalling({ client_id: 1, project_id: 1 });
 
       expect(prisma.client.update).toHaveBeenCalledWith({
-        where: { id: 1n },
+        where: { id: 1 },
         data: { nextDialAt: expect.any(Date) },
       });
     });
@@ -534,9 +535,9 @@ describe('CallsService', () => {
       await service.notifyCalling({ client_id: 1, project_id: 1 });
 
       expect(prisma.clientProject.upsert).toHaveBeenCalledWith({
-        where: { clientId_projectId: { clientId: 1n, projectId: 1 } },
+        where: { clientId_projectId: { clientId: 1, projectId: 1 } },
         create: {
-          clientId: 1n,
+          clientId: 1,
           projectId: 1,
           status: 'dial',
           attemptCount: 1,
@@ -546,23 +547,32 @@ describe('CallsService', () => {
       });
     });
 
-    it('should filter by client_number when provided', async () => {
+    it('should ignore client_number and update by client_id directly', async () => {
       await service.notifyCalling({ client_id: 1, client_number: '555-0100', project_id: 1 });
 
-      expect(prisma.client.findFirst).toHaveBeenCalledWith({
-        where: { id: 1, numbers: { some: { number: '555-0100' } } },
-      });
+      expect(prisma.client.findFirst).not.toHaveBeenCalled();
       expect(prisma.client.update).toHaveBeenCalledWith({
-        where: { id: 1n },
+        where: { id: 1 },
         data: { nextDialAt: expect.any(Date) },
       });
+    });
+
+    it('should propagate P2025 for non-existent client (mapped to 404 by PrismaExceptionFilter)', async () => {
+      prisma.client.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('No record was found for an update.', {
+          code: 'P2025',
+          clientVersion: '7.8.0',
+        }),
+      );
+
+      await expect(service.notifyCalling({ client_id: 999 })).rejects.toMatchObject({ code: 'P2025' });
     });
 
     it('should notify calling without project_id', async () => {
       await service.notifyCalling({ client_id: 1 });
 
       expect(prisma.client.update).toHaveBeenCalledWith({
-        where: { id: 1n },
+        where: { id: 1 },
         data: { nextDialAt: expect.any(Date) },
       });
       expect(prisma.project.findFirst).not.toHaveBeenCalled();
