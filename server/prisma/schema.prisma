@@ -5,6 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  env("DATABASE_URL")
 }
 
 model Project {
