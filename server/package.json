@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build": "npx prisma generate && nest build",
-    "start": "npm run build && npm run start:prod",
+    "start": "npm run start:prod",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
