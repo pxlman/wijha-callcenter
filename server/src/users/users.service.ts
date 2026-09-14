@@ -176,7 +176,7 @@ async deactivate(id: number): Promise<UserResponseDto> {
       }
 
       return users;
-    });
+    }, { timeout: 6000 });
   }
 
   async uploadProfileImage(userId: number, buffer: Buffer, mime: string): Promise<UserResponseDto> {

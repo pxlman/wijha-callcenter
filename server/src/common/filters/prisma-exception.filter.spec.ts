@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, RequestTimeoutException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaExceptionFilter } from './prisma-exception.filter';
 
@@ -22,7 +22,16 @@ describe('PrismaExceptionFilter', () => {
     expect(() => filter.catch(error, {} as never)).toThrow(NotFoundException);
   });
 
-  it('should rethrow non-P2025 errors unchanged', () => {
+  it('should map P2028 to RequestTimeoutException', () => {
+    const error = new Prisma.PrismaClientKnownRequestError('Transaction timeout', {
+      code: 'P2028',
+      clientVersion: '7.8.0',
+    });
+
+    expect(() => filter.catch(error, {} as never)).toThrow(RequestTimeoutException);
+  });
+
+  it('should rethrow other errors unchanged', () => {
     const error = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
       code: 'P2002',
       clientVersion: '7.8.0',

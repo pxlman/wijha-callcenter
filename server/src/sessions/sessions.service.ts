@@ -139,7 +139,7 @@ export class SessionsService {
           is_active: false,
           duration,
         };
-      });
+      }, { timeout: 6000 });
     } catch (error) {
       console.error('Error occurred while creating session:', error);
       throw error;
@@ -192,7 +192,7 @@ export class SessionsService {
         update: { firstBeat: now },
       });
       return s;
-    });
+    }, { timeout: 6000 });
 
     return {
       agent_id: created.agentId,
