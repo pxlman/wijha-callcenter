@@ -7,6 +7,34 @@ import type { ClientResponseDto } from './dto/client-response.dto';
 import type { StatusCountDto } from '@/calls/dto/status-count.dto';
 import { ClientType, fromDbType, toDbType } from './dto/client-type.enum';
 
+const BULK_CONCURRENCY = 10;
+
+function pLimit(concurrency: number) {
+  let active = 0;
+  const queue: (() => void)[] = [];
+  const next = () => {
+    active--;
+    if (queue.length > 0) queue.shift()!();
+  };
+  return <T>(fn: () => Promise<T>): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const run = () => {
+        active++;
+        fn().then(resolve, reject).finally(next);
+      };
+      if (active < concurrency) run();
+      else queue.push(run);
+    });
+}
+
+export type BulkItemStatus = 'created' | 'updated' | 'duplicate_in_batch' | 'db_error';
+
+export type BulkImportResult = ClientResponseDto & {
+  status: BulkItemStatus;
+  input: CreateClientDto;
+  error?: string;
+};
+
 type ClientWithRelations = {
   id: bigint;
   name?: string | null;
@@ -95,17 +123,62 @@ export class ClientsService {
     return this.upsertClient(this.prisma, dto);
   }
 
-  async createBulk(dtos: CreateClientDto[]): Promise<ClientResponseDto[]> {
-    return this.prisma.$transaction(async (tx) => {
-      const results: ClientResponseDto[] = [];
-      for (const dto of dtos) {
-        results.push(await this.upsertClient(tx, dto));
-      }
-      return results;
+  async createBulk(dtos: CreateClientDto[]): Promise<BulkImportResult[]> {
+    const limit = pLimit(BULK_CONCURRENCY);
+
+    // Deduplicate by first phone number — last value wins
+    const seen = new Map<string, number>();
+    const duplicateIndices = new Set<number>();
+    dtos.forEach((dto, i) => {
+      const key = dto.phones[0]?.phone;
+      if (!key) return;
+      if (seen.has(key)) duplicateIndices.add(i);
+      seen.set(key, i);
     });
+
+    return Promise.all(
+      dtos.map((dto, i) =>
+        limit(async () => {
+          if (duplicateIndices.has(i)) {
+            return {
+              ...this.emptyClientResponse(dto),
+              status: 'duplicate_in_batch' as const,
+              input: dto,
+              error: 'Duplicate phone in batch — last value wins',
+            };
+          }
+          try {
+            let existed = false;
+            const result = await this.upsertClient(this.prisma, dto, () => { existed = true; });
+            return { ...result, status: (existed ? 'updated' : 'created') as BulkItemStatus, input: dto };
+          } catch (error) {
+            return {
+              ...this.emptyClientResponse(dto),
+              status: 'db_error' as const,
+              input: dto,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            };
+          }
+        }),
+      ),
+    );
   }
 
-  private async upsertClient(client: Pick<PrismaService, 'number' | 'client' | 'clientInfo' | 'clientProject'>, dto: CreateClientDto): Promise<ClientResponseDto> {
+  private emptyClientResponse(dto: CreateClientDto): ClientResponseDto {
+    return {
+      id: 0,
+      name: dto.name,
+      type: dto.type,
+      phones: dto.phones.map((p) => ({ phone: p.phone })),
+      info: dto.info?.map((i) => ({ key: i.key ?? '', value: i.value ?? '' })),
+    };
+  }
+
+  private async upsertClient(
+    client: Pick<PrismaService, 'number' | 'client' | 'clientInfo' | 'clientProject'>,
+    dto: CreateClientDto,
+    onExisting?: () => void,
+  ): Promise<ClientResponseDto> {
     const phoneNumbers: string[] = dto.phones.map((n) => n.phone);
     const existingNumber = await client.number.findFirst({
       where: { number: { in: phoneNumbers } },
@@ -113,6 +186,7 @@ export class ClientsService {
     });
 
     if (existingNumber) {
+      onExisting?.();
       const existingClient = existingNumber.client;
       const existingPhoneValues: string[] = existingClient.numbers.map((n: { number: string }) => n.number);
       const newNumbers: string[] = phoneNumbers.filter((n: string) => !existingPhoneValues.includes(n));

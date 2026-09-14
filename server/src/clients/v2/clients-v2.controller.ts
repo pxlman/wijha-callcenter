@@ -20,6 +20,7 @@ import { UpdateClientDto } from '../dto/update-client.dto';
 import { AssignProjectDto } from '../dto/assign-project.dto';
 import { ListClientsQueryDto } from '../dto/list-clients-query.dto';
 import type { ClientResponseDto } from '../dto/client-response.dto';
+import type { BulkImportResult } from '../clients.service';
 import type { StatusCountDto } from '@/calls/dto/status-count.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 
@@ -48,7 +49,7 @@ export class ClientsV2Controller {
 
   @Post('bulk')
   @HttpCode(HttpStatus.CREATED)
-  async createBulk(@Body() dto: BulkCreateClientsDto): Promise<ClientResponseDto[]> {
+  async createBulk(@Body() dto: BulkCreateClientsDto): Promise<BulkImportResult[]> {
     const items: CreateClientDto[] | undefined = dto.clients ?? dto.owners;
     if (!items || items.length === 0) {
       throw new BadRequestException('Provide a non-empty clients array');

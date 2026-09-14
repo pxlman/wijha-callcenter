@@ -122,6 +122,21 @@ components:
           deprecated: true
           description: Deprecated v1 alias of clients; either clients or owners must be provided
 
+    BulkImportResult:
+      allOf:
+        - $ref: "#/components/schemas/Client"
+        - type: object
+          required: [status, input]
+          properties:
+            status:
+              type: string
+              enum: [created, updated, duplicate_in_batch, db_error]
+            input:
+              $ref: "#/components/schemas/CreateClientRequest"
+            error:
+              type: string
+              nullable: true
+
     Project:
       type: object
       required: [id, name]
@@ -647,7 +662,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Client"
+                  $ref: "#/components/schemas/BulkImportResult"
         "422":
           $ref: "#/components/responses/ValidationError"
 
@@ -864,7 +879,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Client"
+                  $ref: "#/components/schemas/BulkImportResult"
         "422":
           $ref: "#/components/responses/ValidationError"
 

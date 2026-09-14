@@ -380,53 +380,73 @@ describe('ClientsService', () => {
 
       expect(results).toHaveLength(2);
       expect(results[0].name).toBe('Alice');
+      expect(results[0].status).toBe('created');
       expect(results[1].name).toBe('Bob');
+      expect(results[1].status).toBe('created');
     });
 
-    it('should merge when duplicate number appears later in bulk', async () => {
-      prisma.number.findFirst
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
-          number: '555-1111',
-          clientId: 3n,
-          client: mockClient({ id: 3n, name: 'Alice', numbers: [mockNumber({ number: '555-1111' })], clientInfo: [] }),
-        } as any);
-
-      prisma.client.create.mockResolvedValue(
-        mockClient({ id: 3n, name: 'Alice', numbers: [mockNumber({ number: '555-1111' })], clientInfo: [] }),
-      );
+    it('should merge into existing client and return updated status', async () => {
+      const existingClient = mockClient({
+        id: 2n, name: 'Existing',
+        numbers: [mockNumber({ number: '555-0001' })],
+        clientInfo: [],
+      });
+      prisma.number.findFirst.mockResolvedValue({
+        number: '555-0001',
+        clientId: 2n,
+        client: existingClient,
+      } as any);
       prisma.client.update.mockResolvedValue(
         mockClient({
-          id: 3n, name: 'Alice',
-          numbers: [mockNumber({ number: '555-1111' }), mockNumber({ number: '555-3333' })],
+          id: 2n, name: 'Existing',
+          numbers: [mockNumber({ number: '555-0001' }), mockNumber({ number: '555-0002' })],
           clientInfo: [],
         }),
       );
 
       const results = await service.createBulk([
+        { name: 'Existing', phones: [{ phone: '555-0001' }, { phone: '555-0002' }], project_id: 1 },
+      ]);
+
+      expect(results).toHaveLength(1);
+      expect(results[0].status).toBe('updated');
+      expect(results[0].phones).toHaveLength(2);
+    });
+
+    it('should skip duplicate phone in batch with duplicate_in_batch status', async () => {
+      prisma.number.findFirst.mockResolvedValue(null);
+      prisma.client.create.mockResolvedValue(
+        mockClient({ id: 3n, name: 'Alice', numbers: [mockNumber({ number: '555-1111' })], clientInfo: [] }),
+      );
+
+      const results = await service.createBulk([
         { name: 'Alice', phones: [{ phone: '555-1111' }], project_id: 1 },
-        { name: 'Alice Extended', phones: [{ phone: '555-1111' }, { phone: '555-3333' }], project_id: 1 },
+        { name: 'Alice Again', phones: [{ phone: '555-1111' }], project_id: 1 },
       ]);
 
       expect(results).toHaveLength(2);
-      expect(results[1].name).toBe('Alice');
-      expect(results[1].phones).toHaveLength(2);
+      expect(results[0].status).toBe('created');
+      expect(results[1].status).toBe('duplicate_in_batch');
+      expect(results[1].error).toContain('Duplicate phone in batch');
     });
 
-    it('should rollback when an error occurs', async () => {
+    it('should return db_error status for failed items without failing the batch', async () => {
       prisma.number.findFirst.mockResolvedValue(null);
       prisma.client.create
         .mockResolvedValueOnce(
           mockClient({ id: 3n, name: 'Alice', numbers: [mockNumber({ number: '555-1111' })], clientInfo: [] }),
         )
-        .mockRejectedValueOnce(new Error('DB error'));
+        .mockRejectedValueOnce(new Error('DB connection lost'));
 
-      await expect(
-        service.createBulk([
-          { name: 'Alice', phones: [{ phone: '555-1111' }], project_id: 1 },
-          { name: 'Bob', phones: [{ phone: '555-2222' }], project_id: 1 },
-        ]),
-      ).rejects.toThrow('DB error');
+      const results = await service.createBulk([
+        { name: 'Alice', phones: [{ phone: '555-1111' }], project_id: 1 },
+        { name: 'Bob', phones: [{ phone: '555-2222' }], project_id: 1 },
+      ]);
+
+      expect(results).toHaveLength(2);
+      expect(results[0].status).toBe('created');
+      expect(results[1].status).toBe('db_error');
+      expect(results[1].error).toBe('DB connection lost');
     });
 
     it('should accept type field in each entry', async () => {

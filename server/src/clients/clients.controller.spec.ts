@@ -169,7 +169,9 @@ describe('ClientsController', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0].name).toBe('Alice');
+      expect(result[0].status).toBe('created');
       expect(result[1].name).toBe('Bob');
+      expect(result[1].status).toBe('created');
       expect(prisma.client.create).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({ data: expect.objectContaining({ agentId: 3 }) }),
@@ -188,6 +190,7 @@ describe('ClientsController', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Alias');
+      expect(result[0].status).toBe('created');
     });
 
     it('should reject empty bulk payload', async () => {
